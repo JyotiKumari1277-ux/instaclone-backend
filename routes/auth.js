@@ -77,8 +77,11 @@ router.post("/login", async (req, res) => {
       return res.status(400).json({ message: "All fields are required" });
     }
 
-    const user = await User.findOne({ email: email.toLowerCase() });
+    const identifier = email.toLowerCase();
 
+    const user = await User.findOne({
+      $or: [{ email: identifier }, { username: identifier }],
+    });
     if (!user) {
       return res.status(400).json({ message: "Invalid credentials" });
     }
