@@ -21,6 +21,15 @@ router.post("/register", async (req, res) => {
       return res.status(400).json({ message: "All fields are required" });
     }
 
+    // Username validation - no email, no spaces, lowercase only
+    const usernameRegex = /^[a-z0-9_.]{3,20}$/;
+    if (!usernameRegex.test(username.toLowerCase())) {
+      return res.status(400).json({
+        message:
+          "Invalid username. Use 3-20 characters: lowercase letters, numbers, underscore, or dot only. No @ symbol or spaces.",
+      });
+    }
+
     const existingUser = await User.findOne({
       $or: [{ email }, { username }],
     });
