@@ -1,6 +1,7 @@
 const express = require("express");
 const Post = require("../models/Post");
 const User = require("../models/User");
+const Notification = require("../models/Notification");
 const protect = require("../middleware/auth");
 const { uploadPost } = require("../config/cloudinary");
 
@@ -65,6 +66,24 @@ router.put("/:id/like", protect, async (req, res) => {
       );
     } else {
       post.likes.push(req.user.id);
+
+      // Create notification only when liking (not unliking), and not for own post
+      if (post.user.toString() !== req.user.id) {
+        const notification = await Notification.create({
+          recipient: post.user,
+          sender: req.user.id,
+          type: "like",
+          post: post._id,
+        });
+
+        const populatedNotif = await notification.populate(
+          "sender",
+          "name username avatar"
+        );
+
+        const io = req.app.get("io");
+        io.to(post.user.toString()).emit("newNotification", populatedNotif);
+      }
     }
 
     await post.save();
@@ -96,6 +115,24 @@ router.post("/:id/comment", protect, async (req, res) => {
 
     post.comments.push({ user: req.user.id, text });
     await post.save();
+
+    // Create notification, not for own post
+    if (post.user.toString() !== req.user.id) {
+      const notification = await Notification.create({
+        recipient: post.user,
+        sender: req.user.id,
+        type: "comment",
+        post: post._id,
+      });
+
+      const populatedNotif = await notification.populate(
+        "sender",
+        "name username avatar"
+      );
+
+      const io = req.app.get("io");
+      io.to(post.user.toString()).emit("newNotification", populatedNotif);
+    }
 
     const populatedPost = await post.populate(
       "comments.user",
