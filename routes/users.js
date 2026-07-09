@@ -20,6 +20,8 @@ router.get("/:id", protect, async (req, res) => {
       .populate("user", "name username avatar")
       .sort({ createdAt: -1 });
 
+    const isOwnProfile = req.params.id === req.user.id;
+
     res.status(200).json({
       user: {
         id: user._id,
@@ -30,6 +32,8 @@ router.get("/:id", protect, async (req, res) => {
         followersCount: user.followers.length,
         followingCount: user.following.length,
         isFollowing: user.followers.includes(req.user.id),
+        // Only include email if viewing your own profile
+        ...(isOwnProfile && { email: user.email }),
       },
       posts,
     });
@@ -135,19 +139,43 @@ router.get("/me/saved", protect, async (req, res) => {
   }
 });
 
-// @route   PUT /api/users/me/update  (update profile: bio + avatar)
+// @route   PUT /api/users/me/update  (update profile: name, username, bio + avatar)
 router.put(
   "/me/update",
   protect,
   uploadAvatar.single("avatar"),
   async (req, res) => {
     try {
-      const { name, bio } = req.body;
+      const { name, username, bio } = req.body;
       const updateData = {};
 
       if (name) updateData.name = name;
       if (bio !== undefined) updateData.bio = bio;
       if (req.file) updateData.avatar = req.file.path;
+
+      // Username update - validate + check uniqueness
+      if (username) {
+        const usernameRegex = /^[a-z0-9_.]{3,20}$/;
+        const lowerUsername = username.toLowerCase();
+
+        if (!usernameRegex.test(lowerUsername)) {
+          return res.status(400).json({
+            message:
+              "Invalid username. Use 3-20 characters: lowercase letters, numbers, underscore, or dot only.",
+          });
+        }
+
+        const existingUser = await User.findOne({
+          username: lowerUsername,
+          _id: { $ne: req.user.id },
+        });
+
+        if (existingUser) {
+          return res.status(400).json({ message: "Username already taken" });
+        }
+
+        updateData.username = lowerUsername;
+      }
 
       const updatedUser = await User.findByIdAndUpdate(
         req.user.id,
