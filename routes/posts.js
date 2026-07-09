@@ -67,7 +67,7 @@ router.put("/:id/like", protect, async (req, res) => {
     } else {
       post.likes.push(req.user.id);
 
-      // Create notification only when liking (not unliking), and not for own post
+      // Create notification (only if liking someone else's post)
       if (post.user.toString() !== req.user.id) {
         const notification = await Notification.create({
           recipient: post.user,
@@ -116,7 +116,7 @@ router.post("/:id/comment", protect, async (req, res) => {
     post.comments.push({ user: req.user.id, text });
     await post.save();
 
-    // Create notification, not for own post
+    // Create notification (only if commenting on someone else's post)
     if (post.user.toString() !== req.user.id) {
       const notification = await Notification.create({
         recipient: post.user,
