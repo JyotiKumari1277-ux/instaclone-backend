@@ -7,6 +7,27 @@ const { uploadAvatar } = require("../config/cloudinary");
 
 const router = express.Router();
 
+// @route   GET /api/users/search/:query  (search users by username or name)
+router.get("/search/:query", protect, async (req, res) => {
+  try {
+    const query = req.params.query;
+
+    const users = await User.find({
+      $or: [
+        { username: { $regex: query, $options: "i" } },
+        { name: { $regex: query, $options: "i" } },
+      ],
+    })
+      .select("name username avatar")
+      .limit(20);
+
+    res.status(200).json(users);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: "Server error", error: error.message });
+  }
+});
+
 // @route   GET /api/users/:id  (profile info + their posts)
 router.get("/:id", protect, async (req, res) => {
   try {
