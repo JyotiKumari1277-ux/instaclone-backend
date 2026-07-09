@@ -152,6 +152,7 @@ router.put(
       if (name) updateData.name = name;
       if (bio !== undefined) updateData.bio = bio;
       if (req.file) updateData.avatar = req.file.path;
+      if (req.body.removeAvatar === "true") updateData.avatar = "";
 
       // Username update - validate + check uniqueness
       if (username) {
