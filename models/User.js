@@ -42,6 +42,14 @@ const userSchema = new mongoose.Schema(
     savedPosts: [
       { type: mongoose.Schema.Types.ObjectId, ref: "Post" },
     ],
+    resetOtp: {
+      type: String,
+      default: null,
+    },
+    resetOtpExpires: {
+      type: Date,
+      default: null,
+    },
   },
   { timestamps: true }
 );
