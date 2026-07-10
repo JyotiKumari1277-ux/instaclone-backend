@@ -1,18 +1,10 @@
-const nodemailer = require("nodemailer");
+const { Resend } = require("resend");
 
-const transporter = nodemailer.createTransport({
-  host: "smtp.gmail.com",
-  port: 587,
-  secure: false, // true for 465, false for other ports
-  auth: {
-    user: process.env.EMAIL_USER,
-    pass: process.env.EMAIL_PASS,
-  },
-});
+const resend = new Resend(process.env.RESEND_API_KEY);
 
 const sendOtpEmail = async (toEmail, otp) => {
-  const mailOptions = {
-    from: `"InstaClone" <${process.env.EMAIL_USER}>`,
+  await resend.emails.send({
+    from: "InstaClone <onboarding@resend.dev>",
     to: toEmail,
     subject: "Your InstaClone Password Reset Code",
     html: `
@@ -25,9 +17,7 @@ const sendOtpEmail = async (toEmail, otp) => {
         <p style="color: #888; font-size: 13px;">If you didn't request this, you can safely ignore this email.</p>
       </div>
     `,
-  };
-
-  await transporter.sendMail(mailOptions);
+  });
 };
 
 module.exports = { sendOtpEmail };
