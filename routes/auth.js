@@ -2,6 +2,8 @@ const express = require("express");
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
 const User = require("../models/User");
+const protect = require("../middleware/auth");
+const { sendOtpEmail } = require("../config/email");
 
 const router = express.Router();
 
@@ -10,6 +12,10 @@ const generateToken = (userId) => {
   return jwt.sign({ id: userId }, process.env.JWT_SECRET, {
     expiresIn: "30d",
   });
+};
+
+const generateOtp = () => {
+  return Math.floor(100000 + Math.random() * 900000).toString(); // 6-digit OTP
 };
 
 // @route   POST /api/auth/register
@@ -98,6 +104,143 @@ router.post("/login", async (req, res) => {
         bio: user.bio,
       },
     });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: "Server error", error: error.message });
+  }
+});
+
+// @route   POST /api/auth/forgot-password  (send OTP to email)
+router.post("/forgot-password", async (req, res) => {
+  try {
+    const { email } = req.body;
+
+    if (!email) {
+      return res.status(400).json({ message: "Email is required" });
+    }
+
+    const user = await User.findOne({ email: email.toLowerCase() });
+
+    if (!user) {
+      return res
+        .status(404)
+        .json({ message: "No account found with this email" });
+    }
+
+    const otp = generateOtp();
+    user.resetOtp = otp;
+    user.resetOtpExpires = Date.now() + 10 * 60 * 1000; // 10 minutes
+    await user.save();
+
+    await sendOtpEmail(user.email, otp);
+
+    res.status(200).json({ message: "OTP sent to your email" });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: "Server error", error: error.message });
+  }
+});
+
+// @route   POST /api/auth/verify-otp  (verify OTP before allowing reset)
+router.post("/verify-otp", async (req, res) => {
+  try {
+    const { email, otp } = req.body;
+
+    if (!email || !otp) {
+      return res.status(400).json({ message: "Email and OTP are required" });
+    }
+
+    const user = await User.findOne({ email: email.toLowerCase() });
+
+    if (!user || !user.resetOtp || !user.resetOtpExpires) {
+      return res.status(400).json({ message: "Invalid or expired OTP" });
+    }
+
+    if (user.resetOtp !== otp) {
+      return res.status(400).json({ message: "Incorrect OTP" });
+    }
+
+    if (user.resetOtpExpires < Date.now()) {
+      return res.status(400).json({ message: "OTP has expired" });
+    }
+
+    res.status(200).json({ message: "OTP verified" });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: "Server error", error: error.message });
+  }
+});
+
+// @route   POST /api/auth/reset-password  (set new password after OTP verified)
+router.post("/reset-password", async (req, res) => {
+  try {
+    const { email, otp, newPassword } = req.body;
+
+    if (!email || !otp || !newPassword) {
+      return res.status(400).json({ message: "All fields are required" });
+    }
+
+    if (newPassword.length < 6) {
+      return res
+        .status(400)
+        .json({ message: "Password must be at least 6 characters" });
+    }
+
+    const user = await User.findOne({ email: email.toLowerCase() });
+
+    if (!user || !user.resetOtp || !user.resetOtpExpires) {
+      return res.status(400).json({ message: "Invalid or expired OTP" });
+    }
+
+    if (user.resetOtp !== otp) {
+      return res.status(400).json({ message: "Incorrect OTP" });
+    }
+
+    if (user.resetOtpExpires < Date.now()) {
+      return res.status(400).json({ message: "OTP has expired" });
+    }
+
+    const salt = await bcrypt.genSalt(10);
+    user.password = await bcrypt.hash(newPassword, salt);
+    user.resetOtp = null;
+    user.resetOtpExpires = null;
+    await user.save();
+
+    res.status(200).json({ message: "Password reset successful" });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: "Server error", error: error.message });
+  }
+});
+
+// @route   PUT /api/auth/change-password  (logged-in user changes password)
+router.put("/change-password", protect, async (req, res) => {
+  try {
+    const { currentPassword, newPassword } = req.body;
+
+    if (!currentPassword || !newPassword) {
+      return res.status(400).json({ message: "All fields are required" });
+    }
+
+    if (newPassword.length < 6) {
+      return res
+        .status(400)
+        .json({ message: "New password must be at least 6 characters" });
+    }
+
+    const user = await User.findById(req.user.id);
+
+    const isMatch = await bcrypt.compare(currentPassword, user.password);
+
+    if (!isMatch) {
+      return res.status(400).json({ message: "Current password is incorrect" });
+    }
+
+    const salt = await bcrypt.genSalt(10);
+    user.password = await bcrypt.hash(newPassword, salt);
+    await user.save();
+
+    res.status(200).json({ message: "Password changed successfully" });
   } catch (error) {
     console.error(error);
     res.status(500).json({ message: "Server error", error: error.message });
