@@ -68,6 +68,11 @@ router.get("/", protect, async (req, res) => {
 
     const stories = await Story.find({ user: { $in: userIds } })
       .populate("user", "name username avatar")
+      .populate({
+        path: "sourcePost",
+        select: "image caption user",
+        populate: { path: "user", select: "username avatar" },
+      })
       .sort({ createdAt: -1 });
 
     const grouped = {};
