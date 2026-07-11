@@ -114,4 +114,31 @@ router.post("/:userId", protect, async (req, res) => {
   }
 });
 
+// @route   DELETE /api/messages/:messageId  (unsend a message - sender only)
+router.delete("/:messageId", protect, async (req, res) => {
+  try {
+    const message = await Message.findById(req.params.messageId);
+
+    if (!message) {
+      return res.status(404).json({ message: "Message not found" });
+    }
+
+    if (message.sender.toString() !== req.user.id) {
+      return res.status(403).json({ message: "You can only unsend your own messages" });
+    }
+
+    const receiverId = message.receiver.toString();
+
+    await message.deleteOne();
+
+    const io = req.app.get("io");
+    io.to(receiverId).emit("messageDeleted", { messageId: req.params.messageId });
+
+    res.status(200).json({ message: "Message unsent" });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: "Server error", error: error.message });
+  }
+});
+
 module.exports = router;
