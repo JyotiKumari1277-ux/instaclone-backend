@@ -14,6 +14,9 @@ const storySchema = new mongoose.Schema(
     viewers: [
       { type: mongoose.Schema.Types.ObjectId, ref: "User" },
     ],
+    likes: [
+      { type: mongoose.Schema.Types.ObjectId, ref: "User" },
+    ],
     expiresAt: {
       type: Date,
       required: true,

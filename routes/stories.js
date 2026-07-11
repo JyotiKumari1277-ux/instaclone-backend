@@ -81,4 +81,56 @@ router.put("/:id/view", protect, async (req, res) => {
   }
 });
 
+// @route   PUT /api/stories/:id/like  (toggle like/unlike on a story)
+router.put("/:id/like", protect, async (req, res) => {
+  try {
+    const story = await Story.findById(req.params.id);
+
+    if (!story) {
+      return res.status(404).json({ message: "Story not found" });
+    }
+
+    const alreadyLiked = story.likes.includes(req.user.id);
+
+    if (alreadyLiked) {
+      story.likes = story.likes.filter(
+        (userId) => userId.toString() !== req.user.id
+      );
+    } else {
+      story.likes.push(req.user.id);
+    }
+
+    await story.save();
+
+    res.status(200).json({
+      likesCount: story.likes.length,
+      liked: !alreadyLiked,
+    });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: "Server error", error: error.message });
+  }
+});
+
+// @route   DELETE /api/stories/:id  (delete own story)
+router.delete("/:id", protect, async (req, res) => {
+  try {
+    const story = await Story.findById(req.params.id);
+
+    if (!story) {
+      return res.status(404).json({ message: "Story not found" });
+    }
+
+    if (story.user.toString() !== req.user.id) {
+      return res.status(403).json({ message: "Not authorized" });
+    }
+
+    await story.deleteOne();
+    res.status(200).json({ message: "Story deleted" });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: "Server error", error: error.message });
+  }
+});
+
 module.exports = router;
