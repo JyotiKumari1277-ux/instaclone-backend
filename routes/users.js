@@ -28,6 +28,26 @@ router.get("/search/:query", protect, async (req, res) => {
   }
 });
 
+// @route   GET /api/users/suggested  (users you don't follow yet)
+router.get("/suggested", protect, async (req, res) => {
+  try {
+    const currentUser = await User.findById(req.user.id);
+
+    const excludeIds = [...currentUser.following, req.user.id];
+
+    const suggestedUsers = await User.find({
+      _id: { $nin: excludeIds },
+    })
+      .select("name username avatar")
+      .limit(10);
+
+    res.status(200).json(suggestedUsers);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: "Server error", error: error.message });
+  }
+});
+
 // @route   GET /api/users/:id  (profile info + their posts)
 router.get("/:id", protect, async (req, res) => {
   try {
