@@ -49,6 +49,24 @@ router.get("/", protect, async (req, res) => {
   }
 });
 
+// @route   GET /api/posts/:id  (single post detail)
+router.get("/:id", protect, async (req, res) => {
+  try {
+    const post = await Post.findById(req.params.id)
+      .populate("user", "name username avatar")
+      .populate("comments.user", "name username avatar");
+
+    if (!post) {
+      return res.status(404).json({ message: "Post not found" });
+    }
+
+    res.status(200).json(post);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: "Server error", error: error.message });
+  }
+});
+
 // @route   PUT /api/posts/:id/like  (toggle like/unlike)
 router.put("/:id/like", protect, async (req, res) => {
   try {
