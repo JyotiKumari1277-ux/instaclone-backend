@@ -14,12 +14,16 @@ const notificationSchema = new mongoose.Schema(
     },
     type: {
       type: String,
-      enum: ["like", "comment"],
+      enum: ["like", "comment", "story_like"],
       required: true,
     },
     post: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "Post",
+    },
+    story: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Story",
     },
     read: {
       type: Boolean,

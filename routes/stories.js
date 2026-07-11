@@ -1,6 +1,7 @@
 const express = require("express");
 const Story = require("../models/Story");
 const User = require("../models/User");
+const Notification = require("../models/Notification");
 const protect = require("../middleware/auth");
 const { uploadPost } = require("../config/cloudinary");
 
@@ -81,6 +82,39 @@ router.put("/:id/view", protect, async (req, res) => {
   }
 });
 
+// @route   GET /api/stories/:id/viewers  (get viewers + likes list - owner only)
+router.get("/:id/viewers", protect, async (req, res) => {
+  try {
+    const story = await Story.findById(req.params.id)
+      .populate("viewers", "name username avatar")
+      .populate("likes", "name username avatar");
+
+    if (!story) {
+      return res.status(404).json({ message: "Story not found" });
+    }
+
+    if (story.user.toString() !== req.user.id) {
+      return res.status(403).json({ message: "Not authorized" });
+    }
+
+    const likedIds = new Set(story.likes.map((u) => u._id.toString()));
+
+    const viewersList = story.viewers.map((u) => ({
+      ...u.toObject(),
+      liked: likedIds.has(u._id.toString()),
+    }));
+
+    res.status(200).json({
+      viewCount: story.viewers.length,
+      likeCount: story.likes.length,
+      viewers: viewersList,
+    });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: "Server error", error: error.message });
+  }
+});
+
 // @route   PUT /api/stories/:id/like  (toggle like/unlike on a story)
 router.put("/:id/like", protect, async (req, res) => {
   try {
@@ -98,6 +132,24 @@ router.put("/:id/like", protect, async (req, res) => {
       );
     } else {
       story.likes.push(req.user.id);
+
+      // Create notification (only if liking someone else's story)
+      if (story.user.toString() !== req.user.id) {
+        const notification = await Notification.create({
+          recipient: story.user,
+          sender: req.user.id,
+          type: "story_like",
+          story: story._id,
+        });
+
+        const populatedNotif = await notification.populate(
+          "sender",
+          "name username avatar"
+        );
+
+        const io = req.app.get("io");
+        io.to(story.user.toString()).emit("newNotification", populatedNotif);
+      }
     }
 
     await story.save();
