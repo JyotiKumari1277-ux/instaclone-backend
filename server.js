@@ -10,6 +10,7 @@ const postRoutes = require("./routes/posts");
 const userRoutes = require("./routes/users");
 const notificationRoutes = require("./routes/notifications");
 const messageRoutes = require("./routes/messages");
+const storyRoutes = require("./routes/stories");
 
 const app = express();
 const server = http.createServer(app);
@@ -63,6 +64,7 @@ app.use("/api/posts", postRoutes);
 app.use("/api/users", userRoutes);
 app.use("/api/notifications", notificationRoutes);
 app.use("/api/messages", messageRoutes);
+app.use("/api/stories", storyRoutes);
 
 // Health check
 app.get("/", (req, res) => {
