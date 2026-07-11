@@ -20,6 +20,10 @@ const messageSchema = new mongoose.Schema(
       type: mongoose.Schema.Types.ObjectId,
       ref: "Post",
     },
+    sharedStory: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Story",
+    },
     read: {
       type: Boolean,
       default: false,

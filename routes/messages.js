@@ -58,6 +58,7 @@ router.get("/:userId", protect, async (req, res) => {
       .populate("sender", "name username avatar")
       .populate("receiver", "name username avatar")
       .populate("sharedPost", "image caption user")
+      .populate("sharedStory", "image user")
       .sort({ createdAt: 1 });
 
     await Message.updateMany(
@@ -72,16 +73,16 @@ router.get("/:userId", protect, async (req, res) => {
   }
 });
 
-// @route   POST /api/messages/:userId  (send a message - text and/or shared post)
+// @route   POST /api/messages/:userId  (send a message - text, shared post, or story reply)
 router.post("/:userId", protect, async (req, res) => {
   try {
-    const { text, sharedPostId } = req.body;
+    const { text, sharedPostId, storyId } = req.body;
     const receiverId = req.params.userId;
 
-    if (!text?.trim() && !sharedPostId) {
+    if (!text?.trim() && !sharedPostId && !storyId) {
       return res
         .status(400)
-        .json({ message: "Message must have text or a shared post" });
+        .json({ message: "Message must have text, a shared post, or a story" });
     }
 
     if (receiverId === req.user.id) {
@@ -93,12 +94,14 @@ router.post("/:userId", protect, async (req, res) => {
       receiver: receiverId,
       text: text?.trim() || "",
       sharedPost: sharedPostId || undefined,
+      sharedStory: storyId || undefined,
     });
 
     const populatedMessage = await newMessage.populate([
       { path: "sender", select: "name username avatar" },
       { path: "receiver", select: "name username avatar" },
       { path: "sharedPost", select: "image caption user" },
+      { path: "sharedStory", select: "image user" },
     ]);
 
     const io = req.app.get("io");
