@@ -11,6 +11,10 @@ const storySchema = new mongoose.Schema(
       type: String,
       required: true,
     },
+    sourcePost: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Post",
+    },
     viewers: [
       { type: mongoose.Schema.Types.ObjectId, ref: "User" },
     ],

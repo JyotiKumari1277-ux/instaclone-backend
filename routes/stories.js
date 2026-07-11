@@ -1,5 +1,6 @@
 const express = require("express");
 const Story = require("../models/Story");
+const Post = require("../models/Post");
 const User = require("../models/User");
 const Notification = require("../models/Notification");
 const protect = require("../middleware/auth");
@@ -23,6 +24,33 @@ router.post("/", protect, uploadPost.single("image"), async (req, res) => {
       "user",
       "name username avatar"
     );
+
+    res.status(201).json(populatedStory);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: "Server error", error: error.message });
+  }
+});
+
+// @route   POST /api/stories/from-post/:postId  (add an existing post to your story)
+router.post("/from-post/:postId", protect, async (req, res) => {
+  try {
+    const post = await Post.findById(req.params.postId);
+
+    if (!post) {
+      return res.status(404).json({ message: "Post not found" });
+    }
+
+    const newStory = await Story.create({
+      user: req.user.id,
+      image: post.image,
+      sourcePost: post._id,
+    });
+
+    const populatedStory = await newStory.populate([
+      { path: "user", select: "name username avatar" },
+      { path: "sourcePost", select: "image caption user" },
+    ]);
 
     res.status(201).json(populatedStory);
   } catch (error) {
@@ -133,7 +161,6 @@ router.put("/:id/like", protect, async (req, res) => {
     } else {
       story.likes.push(req.user.id);
 
-      // Create notification (only if liking someone else's story)
       if (story.user.toString() !== req.user.id) {
         const notification = await Notification.create({
           recipient: story.user,
