@@ -48,6 +48,34 @@ router.get("/suggested", protect, async (req, res) => {
   }
 });
 
+// @route   DELETE /api/users/me  (permanently delete own account)
+router.delete("/me", protect, async (req, res) => {
+  try {
+    const userId = req.user.id;
+
+    await Post.deleteMany({ user: userId });
+    await Notification.deleteMany({
+      $or: [{ recipient: userId }, { sender: userId }],
+    });
+
+    await User.updateMany(
+      { followers: userId },
+      { $pull: { followers: userId } }
+    );
+    await User.updateMany(
+      { following: userId },
+      { $pull: { following: userId } }
+    );
+
+    await User.findByIdAndDelete(userId);
+
+    res.status(200).json({ message: "Account deleted successfully" });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: "Server error", error: error.message });
+  }
+});
+
 // @route   GET /api/users/:id  (profile info + their posts)
 router.get("/:id", protect, async (req, res) => {
   try {
