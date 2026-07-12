@@ -19,8 +19,15 @@ router.get("/conversations", protect, async (req, res) => {
     const conversationsMap = new Map();
 
     messages.forEach((msg) => {
+      // Skip messages where the other user's account no longer exists
+      // (e.g. from an old hard-deleted account before soft-delete was added)
+      if (!msg.sender || !msg.receiver) return;
+
       const otherUser =
         msg.sender._id.toString() === userId ? msg.receiver : msg.sender;
+
+      if (!otherUser) return;
+
       const key = otherUser._id.toString();
 
       if (!conversationsMap.has(key)) {
