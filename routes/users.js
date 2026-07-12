@@ -1,4 +1,6 @@
 const express = require("express");
+const bcrypt = require("bcryptjs");
+const crypto = require("crypto");
 const User = require("../models/User");
 const Post = require("../models/Post");
 const Notification = require("../models/Notification");
@@ -48,16 +50,21 @@ router.get("/suggested", protect, async (req, res) => {
   }
 });
 
-// @route   DELETE /api/users/me  (permanently delete own account)
+// @route   DELETE /api/users/me  (deactivate account: anonymize instead of hard delete
+//          so existing chats/comments still show a valid placeholder user, like Instagram)
 router.delete("/me", protect, async (req, res) => {
   try {
     const userId = req.user.id;
 
+    // Delete this user's own posts
     await Post.deleteMany({ user: userId });
+
+    // Remove notifications involving this user
     await Notification.deleteMany({
       $or: [{ recipient: userId }, { sender: userId }],
     });
 
+    // Remove this user from everyone else's followers/following lists
     await User.updateMany(
       { followers: userId },
       { $pull: { followers: userId } }
@@ -67,7 +74,28 @@ router.delete("/me", protect, async (req, res) => {
       { $pull: { following: userId } }
     );
 
-    await User.findByIdAndDelete(userId);
+    // Anonymize the account (keeps the document alive so old messages/comments
+    // still reference a valid user, displayed as "InstaUser"). This also frees
+    // up the original email/username so the person can sign up again.
+    const suffix = userId.toString().slice(-8);
+    const randomPassword = crypto.randomBytes(20).toString("hex");
+    const hashedRandomPassword = await bcrypt.hash(randomPassword, 10);
+
+    await User.findByIdAndUpdate(userId, {
+      name: "InstaUser",
+      username: `instauser_${suffix}`,
+      email: `deleted_${suffix}@deleted.instaclone`,
+      password: hashedRandomPassword,
+      bio: "",
+      avatar: "",
+      followers: [],
+      following: [],
+      savedPosts: [],
+      resetOtp: null,
+      resetOtpExpires: null,
+      isDeleted: true,
+      deletedAt: new Date(),
+    });
 
     res.status(200).json({ message: "Account deleted successfully" });
   } catch (error) {
